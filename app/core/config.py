@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     github_token: Optional[str] = None
     git_workdir: str = "/tmp/warden-repos"
 
+    # --- Auth (login for the dashboard) ---
+    auth_required: bool = True                  # False => no login (local hacking only)
+    auth_secret: str = "change-me-dev-auth-secret"   # signs session tokens; MUST be changed in production
+    auth_token_ttl_minutes: int = 720
+    auth_allow_signup: bool = True              # first account can always be created
+    database_path: str = "data/warden.db"       # SQLite file for user accounts
+
+    # --- AI assistant (Gemini, uses gemini_api_key / gemini_model above) ---
+    assistant_max_tool_rounds: int = 6
+    gemini_api_base: str = "https://generativelanguage.googleapis.com/v1beta"   # override for a proxy
+
     # --- Pod analytics (Grafana-style metrics) ---
     # kubernetes: real cluster (Kubernetes API + metrics-server). demo: synthetic data,
     # clearly labelled in the API/UI, for exploring the dashboard without a cluster.

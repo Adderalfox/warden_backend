@@ -77,3 +77,18 @@ def test_restarts_in_window_and_summary():
     s = summarize(pods, series)
     assert s["pods_total"] == 2 and s["running"] == 1 and s["pending"] == 1
     assert s["restarts_in_window"] == 2 and s["cpu_m_total"] == 50.0
+
+
+def test_trend_ignores_data_from_before_the_last_restart():
+    from app.metrics.insights import recent_segment
+    step, n = 15, 60
+    ts = [1000.0 + i * step for i in range(n)]
+    # climbs to 500 MiB, container restarts at i=30 (restart counter bumps), climbs again slowly from 100
+    mem = [(100 + 13 * i) * MIB if i < 30 else (100 + 2 * (i - 30)) * MIB for i in range(n)]
+    restarts = [0.0] * 30 + [1.0] * 30
+    seg_t, seg_v = recent_segment(ts, mem, restarts)
+    assert seg_t[0] == ts[30] and len(seg_t) == 30
+    whole = linear_trend(ts, mem)                       # the naive fit across the reset is misleading
+    after = linear_trend(seg_t, seg_v)
+    assert after and after["slope"] > 0 and after["r2"] > 0.99
+    assert whole is None or whole["r2"] < after["r2"]

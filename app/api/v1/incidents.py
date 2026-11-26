@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/v1/incidents", tags=["incidents"])
 
 @router.get("")
 async def list_incidents():
-    return [dict(s) for s in store.list()]
+    return [{**s, "created_at": store.created_at(s["incident_id"])} for s in store.list()]
 
 
 @router.get("/{incident_id}")
@@ -21,7 +21,7 @@ async def get_incident(incident_id: str):
     state = store.get(incident_id)
     if state is None:
         raise HTTPException(404, "Incident not found")
-    return dict(state)
+    return {**state, "created_at": store.created_at(incident_id)}
 
 
 @router.get("/{incident_id}/stream")

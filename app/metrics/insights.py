@@ -60,6 +60,30 @@ def linear_trend(ts: Sequence[float], ys: Sequence[Optional[float]]) -> Optional
     return {"slope": slope, "r2": r2, "last": pts[-1][1]}
 
 
+def recent_segment(
+    ts: Sequence[float],
+    values: Sequence[Optional[float]],
+    restarts: Optional[Sequence[Optional[float]]] = None,
+    window: float = 1800,
+):
+    """Points to fit a trend on: the last `window` seconds, but only since the most recent
+    container restart (memory resets on restart, so a fit across it is meaningless)."""
+    if not ts:
+        return [], []
+    lo = ts[-1] - window
+    start = 0
+    if restarts:
+        prev = None
+        for i, r in enumerate(restarts):
+            if r is None:
+                continue
+            if prev is not None and r > prev:
+                start = i
+            prev = r
+    pts = [(t, v) for i, (t, v) in enumerate(zip(ts, values)) if i >= start and t >= lo]
+    return [t for t, _ in pts], [v for _, v in pts]
+
+
 def compute_insights(
     pods: Sequence[PodSnapshot],
     series: Optional[SeriesResult] = None,
@@ -146,8 +170,8 @@ def compute_insights(
             p = by_name.get(pod)
             if not p or not p.mem_lim_b:
                 continue
-            tail = [(t, v) for t, v in zip(series.timestamps, mem) if t >= series.timestamps[-1] - 1800]
-            trend = linear_trend([t for t, _ in tail], [v for _, v in tail])
+            seg_t, seg_v = recent_segment(series.timestamps, mem, series.metrics.get("restarts", {}).get(pod))
+            trend = linear_trend(seg_t, seg_v)
             if trend and trend["slope"] > 0 and trend["r2"] >= 0.6 and trend["last"] < p.mem_lim_b:
                 eta = (p.mem_lim_b - trend["last"]) / trend["slope"]
                 if eta < 3600:
